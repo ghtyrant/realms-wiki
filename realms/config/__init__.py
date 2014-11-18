@@ -3,20 +3,23 @@ import json
 from urlparse import urlparse
 
 
-def update(data):
-    conf = read()
+def update(data, path=None):
+    conf = read(path)
     conf.update(data)
     return save(data)
 
 
-def read():
+def read(path=None):
     conf = dict()
 
     for k, v in os.environ.items():
         if k.startswith('REALMS_'):
             conf[k[7:]] = v
 
-    loc = get_path()
+    if path:
+        loc = path
+    else:
+        loc = get_path()
 
     if loc:
         with open(loc) as f:

@@ -103,7 +103,7 @@ def setup(ctx, **kw):
     for k, v in kw.items():
         conf[k.upper()] = v
 
-    conf_path = config.update(conf)
+    conf_path = config.update(conf, path=ctx.obj["CONFIG_PATH"])
 
     if conf['CACHE_TYPE'] == 'redis':
         ctx.invoke(setup_redis)
@@ -137,13 +137,14 @@ def setup(ctx, **kw):
 @click.option('--cache-redis-db',
               default=getattr(config, 'CACHE_REDIS_DB', 0),
               prompt='Redis db')
-def setup_redis(**kw):
+@click.pass_context
+def setup_redis(ctx, **kw):
     conf = {}
 
     for k, v in kw.items():
         conf[k.upper()] = v
 
-    config.update(conf)
+    config.update(conf, path=ctx.obj["CONFIG_PATH"])
     install_redis()
 
 
@@ -151,13 +152,14 @@ def setup_redis(**kw):
 @click.option('--elasticsearch-url',
               default=getattr(config, 'ELASTICSEARCH_URL', 'http://127.0.0.1:9200'),
               prompt='Elasticsearch URL')
-def setup_elasticsearch(**kw):
+@click.pass_context
+def setup_elasticsearch(ctx, **kw):
     conf = {}
 
     for k, v in kw.items():
         conf[k.upper()] = v
 
-    config.update(conf)
+    config.update(conf, path=ctx.obj["CONFIG_PATH"])
 
 
 def get_prefix():
@@ -166,7 +168,8 @@ def get_prefix():
 
 @cli.command(name='pip')
 @click.argument('cmd', nargs=-1)
-def pip_(cmd):
+@click.pass_context
+def pip_(ctx, cmd):
     """ Execute pip commands, useful for virtualenvs
     """
     pip.main(cmd)
@@ -197,13 +200,14 @@ def install_memcached():
               default=getattr(config, 'CACHE_MEMCACHED_SERVERS', ["127.0.0.1:11211"]),
               type=click.STRING,
               prompt='Memcached servers, separate with a space')
-def setup_memcached(**kw):
+@click.pass_context
+def setup_memcached(ctx, **kw):
     conf = {}
 
     for k, v in kw.items():
         conf[k.upper()] = v
 
-    config.update(conf)
+    config.update(conf, path=ctx.obj["CONFIG_PATH"])
 
 
 @cli.command()
@@ -219,7 +223,8 @@ def setup_memcached(**kw):
               default=cpu_count() * 2 + 1,
               type=click.INT,
               prompt="Number of workers? (defaults to ncpu*2+1)")
-def setup_upstart(**kwargs):
+@click.pass_context
+def setup_upstart(ctx, **kwargs):
     """ Start upstart conf creation wizard
     """
     from realms.lib.util import upstart_script
@@ -234,7 +239,7 @@ def setup_upstart(**kwargs):
 
     kwargs.update(dict(app_dir=app_dir, path=path))
 
-    conf_file = '/etc/init/realms-wiki.conf'
+    conf_file = ctx.obj["CONFIG_PATH"]
     script = upstart_script(**kwargs)
 
     try:
@@ -257,23 +262,25 @@ def setup_upstart(**kwargs):
 
 @cli.command()
 @click.argument('json_string')
-def configure(json_string):
+@click.pass_context
+def configure(ctx, json_string):
     """ Set config, expects JSON encoded string
     """
     try:
-        config.update(json.loads(json_string))
+        config.update(json.loads(json_string), path=ctx.obj["CONFIG_PATH"])
     except ValueError, e:
         red('Config value should be valid JSON')
 
 
 @cli.command()
 @click.option('--port', default=config.PORT)
-def dev(port):
+@click.pass_context
+def dev(ctx, port):
     """ Run development server
     """
     green("Starting development server")
 
-    config_path = config.get_path()
+    config_path = ctx.obj["CONFIG_PATH"]
     if config_path:
         green("Using config: %s" % config_path)
     else:
@@ -315,28 +322,32 @@ def stop_server():
 
 
 @cli.command()
-def run():
+@click.pass_context
+def run(ctx):
     """ Run production server (alias for start)
     """
     start_server()
 
 
 @cli.command()
-def start():
+@click.pass_context
+def start(ctx):
     """ Run server daemon
     """
     start_server()
 
 
 @cli.command()
-def stop():
+@click.pass_context
+def stop(ctx):
     """ Stop server
     """
     stop_server()
 
 
 @cli.command()
-def restart():
+@click.pass_context
+def restart(ctx):
     """ Restart server
     """
     stop_server()
@@ -344,7 +355,8 @@ def restart():
 
 
 @cli.command()
-def status():
+@click.pass_context
+def status(ctx):
     """ Get server status
     """
     pid = get_pid()
@@ -355,7 +367,8 @@ def status():
 
 
 @cli.command()
-def create_db():
+@click.pass_context
+def create_db(ctx):
     """ Creates DB tables
     """
     green("Creating all tables")
@@ -365,8 +378,9 @@ def create_db():
 
 
 @cli.command()
+@click.pass_context
 @click.confirmation_option(help='Are you sure you want to drop the db?')
-def drop_db():
+def drop_db(ctx):
     """ Drops DB tables
     """
     yellow("Dropping all tables")
@@ -375,7 +389,7 @@ def drop_db():
 
 
 @cli.command()
-def test():
+def test(ctx):
     """ Run tests
     """
     for mod in [('flask.ext.testing', 'Flask-Testing'), ('nose', 'nose'), ('blinker', 'blinker')]:
@@ -388,14 +402,14 @@ def test():
 
 
 @cli.command()
-def version():
+def version(ctx):
     """ Output version
     """
     green(__version__)
 
 
 @cli.command(add_help_option=False)
-def deploy():
+def deploy(ctx):
     """ Deploy to PyPI and docker hub
     """
     call("python setup.py sdist upload", shell=True)
@@ -405,4 +419,4 @@ def deploy():
     call("sudo docker push realms/realms-wiki", shell=True)
 
 if __name__ == '__main__':
-    cli()
+    cli(obj={})

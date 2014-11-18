@@ -97,6 +97,9 @@ class Application(Flask):
 
         return super(Application, self).make_response(tuple(rv))
 
+    def load_config(self, config_path):
+        pass
+
 
 class Assets(Environment):
     default_filters = {'js': 'rjsmin', 'css': 'cleancss'}
@@ -152,9 +155,13 @@ def error_handler(e):
     return response, status_code
 
 
-def create_app(config=None):
+def create_app(config_path=None):
     app = Application(__name__)
     app.config.from_object('realms.config')
+
+    if config_path:
+        print("CUSTOM CONFIG PATH: %s" % (config_path))
+
     app.url_map.converters['regex'] = RegexConverter
     app.url_map.strict_slashes = False
 
@@ -226,6 +233,13 @@ assets.register('main.css',
                 'css/style.css')
 
 
+from realms.config import get_path
+
 @click.group()
-def cli():
-    pass
+@click.option('--config-path',
+              default=get_path(),
+              prompt='Enter config path.')
+@click.pass_context
+def cli(ctx, config_path):
+    ctx.obj['CONFIG_PATH'] = config_path
+    ctx.obj['APP'] = create_app(config_path)
